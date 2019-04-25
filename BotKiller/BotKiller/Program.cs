@@ -3,9 +3,10 @@ using System.IO;
 using System.Diagnostics;
 using System.Runtime.InteropServices;
 using Microsoft.Win32;
+using System.Security.Principal;
 
 //       │ Author     : NYAN CAT
-//       │ Name       : Bot Killer v0.2
+//       │ Name       : Bot Killer v0.2.5
 //       │ Contact    : https://github.com/NYAN-x-CAT
 
 //       This program Is distributed for educational purposes only.
@@ -25,29 +26,28 @@ namespace BotKiller
             {
                 try
                 {
-                    string pName = p.MainModule.FileName;
-                    if (Inspection(pName))
+                    string processName = p.MainModule.FileName;
+                    if (Inspection(processName))
                         if (!IsWindowVisible(p.MainWindowHandle))
                         {
                             p.Kill();
-                            RegistryDelete(@"Software\Microsoft\Windows\CurrentVersion\Run", pName);
-                            RegistryDelete(@"Software\Microsoft\Windows\CurrentVersion\RunOnce", pName);
+                            RegistryDelete(@"Software\Microsoft\Windows\CurrentVersion\Run", processName);
+                            RegistryDelete(@"Software\Microsoft\Windows\CurrentVersion\RunOnce", processName);
                             System.Threading.Thread.Sleep(100);
-                            File.Delete(pName);
+                            File.Delete(processName);
                         }
                 }
                 catch { }
             }
         }
 
-        private static bool Inspection(string payload)
+        private static bool Inspection(string threat)
         {
-            if (payload == Process.GetCurrentProcess().MainModule.FileName) return false;
-            if (payload.Contains(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData))) return true;
-            if (payload.Contains(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))) return true;
-            if (payload.Contains(Environment.ExpandEnvironmentVariables("%temp%"))) return true;
-            if (payload.Contains("wscript.exe")) return true;
-            if (payload.Contains(RuntimeEnvironment.GetRuntimeDirectory())) return true;
+            if (threat == Process.GetCurrentProcess().MainModule.FileName) return false;
+            if (threat.Contains(Environment.GetFolderPath(Environment.SpecialFolder.CommonApplicationData))) return true;
+            if (threat.Contains(Environment.GetFolderPath(Environment.SpecialFolder.UserProfile))) return true;
+            if (threat.Contains("wscript.exe")) return true;
+            if (threat.Contains(RuntimeEnvironment.GetRuntimeDirectory())) return true;
             return false;
         }
 
@@ -60,10 +60,23 @@ namespace BotKiller
         {
             using (RegistryKey key = Registry.CurrentUser.OpenSubKey(regPath, true))
             {
-                foreach (string ValueOfName in key.GetValueNames())
+                if (key != null)
+                    foreach (string valueOfName in key.GetValueNames())
+                    {
+                        if (key.GetValue(valueOfName).ToString().Equals(payload))
+                            key.DeleteValue(valueOfName);
+                    }
+            }
+            if (new WindowsPrincipal(WindowsIdentity.GetCurrent()).IsInRole(WindowsBuiltInRole.Administrator))
+            {
+                using (RegistryKey key = Registry.LocalMachine.OpenSubKey(regPath, true))
                 {
-                    if (key.GetValue(ValueOfName).ToString().Equals(payload))
-                        key.DeleteValue(ValueOfName);
+                    if (key != null)
+                        foreach (string valueOfName in key.GetValueNames())
+                        {
+                            if (key.GetValue(valueOfName).ToString().Equals(payload))
+                                key.DeleteValue(valueOfName);
+                        }
                 }
             }
         }
